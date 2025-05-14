@@ -3,19 +3,29 @@ import 'izitoast/dist/css/iziToast.min.css';
 
 const form = document.querySelector('form');
 const msInput = form.elements.delay;
-const fullfieldRadio = form.elements.state[0];
 
 form.addEventListener('submit', evt => {
   evt.preventDefault();
-  createPromise(Number(msInput.value), fullfieldRadio.checked);
+  const selectedState = form.elements.state.value;
+  createPromise(Number(msInput.value), selectedState);
+  form.reset();
 });
 
-function createPromise(delay, shouldResolve) {
+function createPromise(delay, state) {
   if (delay > 0) {
     const promise = new Promise((res, rej) => {
       setTimeout(() => {
-        if (shouldResolve) res(`✅ Fulfilled promise in ${delay}ms`);
-        else rej(`❌ Rejected promise in ${delay}ms`);
+        switch (state) {
+          case 'fulfilled':
+            res(`✅ Fulfilled promise in ${delay}ms`);
+            break;
+          case 'rejected':
+            rej(`❌ Rejected promise in ${delay}ms`);
+            break;
+          default:
+            rej(`[ERROR] Unknown state provided: ${state}`);
+            break;
+        }
       }, delay);
     });
     promise
