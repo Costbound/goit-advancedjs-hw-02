@@ -7,31 +7,56 @@ const dayOut = document.querySelector('[data-days]');
 const hourOut = document.querySelector('[data-hours]');
 const minOut = document.querySelector('[data-minutes]');
 const secOut = document.querySelector('[data-seconds]');
-const startBtn = document.querySelector('button');
+const startBtn = document.querySelector('[data-start]');
 
-let selectedDate;
-startBtn.setAttribute('disabled', '');
+startBtn.setAttribute('disabled', true);
+
+let usersSelectedDate;
 const options = {
   enableTime: true,
   time_24hr: true,
   defaultDate: new Date(),
   minuteIncrement: 1,
-  onClose([selectedDates]) {
-    if (selectedDates < options.defaultDate) {
-      startBtn.setAttribute('disabled', '');
-      iziToast.show({
-        message: 'Please choose a date in the future',
-        backgroundColor: 'rgb(236, 56, 56)',
-        messageColor: '#FFF',
-        position: 'center',
-      });
-    } else {
+  onClose(selectedDates) {
+    const selectedDate = selectedDates[0].getTime();
+    if (isDateInFuture(selectedDate)) {
+      usersSelectedDate = selectedDate;
       startBtn.removeAttribute('disabled');
-      selectedDate = selectedDates.getTime();
     }
   },
 };
 const dateInput = flatpickr('#datetime-picker', options);
+
+startBtn.addEventListener('click', () => {
+  if (!isDateInFuture(usersSelectedDate)) {
+    return;
+  }
+  startBtn.setAttribute('disabled', true);
+  dateInput.element.setAttribute('disabled', true);
+
+  const updateTimer = () => {
+    const now = Date.now();
+    const deltaTime = usersSelectedDate - now;
+    const remainMs = Math.ceil(deltaTime / 1000) * 1000;
+    if (remainMs <= 0) {
+      displayTime();
+      return false;
+    }
+    displayTime(convertMs(remainMs));
+    return true;
+  };
+  updateTimer();
+  const msToNextSecond = 1000 - (Date.now() % 1000);
+  setTimeout(() => {
+    if (!updateTimer()) return;
+    const intervalId = setInterval(() => {
+      if (!updateTimer()) {
+        clearInterval(intervalId);
+        dateInput.element.removeAttribute('disabled');
+      }
+    }, 1000);
+  }, msToNextSecond);
+});
 
 function convertMs(ms) {
   const second = 1000;
@@ -44,41 +69,24 @@ function convertMs(ms) {
   const seconds = Math.floor((((ms % day) % hour) % minute) / second);
   return { days, hours, minutes, seconds };
 }
-startBtn.onclick = () => {
-  if (selectedDate > Date.now()) {
-    const calcTimer = () => {
-      outputsUpdate(
-        [dayOut, hourOut, minOut, secOut],
-        convertMs(selectedDate - Date.now())
-      );
-      if (selectedDate - 1000 < Date.now() && secOut.textContent == '00')
-        clearInterval(timer);
-    };
-    calcTimer();
-    const timer = setInterval(calcTimer, 1000);
-    dateInput.input.setAttribute('disabled', '');
-    startBtn.setAttribute('disabled', '');
-    startBtn.dataset.start = 'started';
-  } else {
-    iziToast.show({
-      message: 'Please choose a date in the future',
-      backgroundColor: 'rgb(236, 56, 56)',
-      messageColor: '#FFF',
-      position: 'center',
-    });
-    startBtn.setAttribute('disabled', '');
-  }
-};
 
-const outputUpdate = (output, time) => {
-  output.textContent = time.toString().padStart(2, '0');
-};
-const outputsUpdate = (
-  [dayOut, hourOut, minOut, secOut],
-  { days, hours, minutes, seconds }
-) => {
-  outputUpdate(dayOut, days);
-  outputUpdate(hourOut, hours);
-  outputUpdate(minOut, minutes);
-  outputUpdate(secOut, seconds);
-};
+function displayTime({ days = 0, hours = 0, minutes = 0, seconds = 0 } = {}) {
+  dayOut.textContent = String(days).padStart(2, '0');
+  hourOut.textContent = String(hours).padStart(2, '0');
+  minOut.textContent = String(minutes).padStart(2, '0');
+  secOut.textContent = String(seconds).padStart(2, '0');
+}
+
+function isDateInFuture(date) {
+  const now = Date.now();
+  const isFuture = date > now;
+  if (!isFuture) {
+    iziToast.error({
+      title: 'Error',
+      message: 'Please choose a date in the future',
+      position: 'topRight',
+    });
+    startBtn.setAttribute('disabled', true);
+  }
+  return isFuture;
+}
